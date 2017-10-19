@@ -28,7 +28,7 @@ Open Scope nat.
 Definition Adequate (R : forall (Γ : Env) (e1 e2 : Expr), Prop) :=
   forall e1 e2,
     R 0 e1 e2 ->
-    forall A, Rbar_le (μeval_star e1 (Knil A)) (μeval_star e2 (Knil A)).
+    forall A, Rbar_le (μeval_star e1 Knil A) (μeval_star e2 Knil A).
 
 Definition IsReflexive (R : forall (Γ : Env) (e1 e2 : Expr), Prop) :=
   forall Γ e,
@@ -127,7 +127,7 @@ Proof.
   split; [|split];
     try solve [repeat constructor;
                auto using succ_ValScoped].
-  intros m Hmn u1 u2 HVrel_u1u2.
+  intros m Hmn u1 u2 A HVrel_u1u2.
   destruct (Vrel_closed HVrel_u1u2) as [Hclosed_u1 Hclosed_u2].
   (* Cases where m < 2 are uninteresting. *)
   destruct m as [|[|]]; auto;
@@ -152,12 +152,6 @@ Proof.
         auto.
 Qed.
 
-Lemma Krel_singleton_related : forall n r,
-    Krel n (Knil (Measurable_Singleton r)) (Knil (Measurable_Singleton r)).
-Proof.
-  eauto.
-Qed.
-
 Lemma not_Erel_Const_Fun : forall n r b,
     ~ Erel (S n) (Const r) (Fun b).
 Proof.
@@ -166,8 +160,8 @@ Proof.
   intros Hrel.
   unfold Erel, Erel' in Hrel.
   destruct Hrel as [Hclosed_b [Hclosed_r Hrel]].
-  specialize (Hrel 1 ltac:(auto) _ _ (Krel_singleton_related _ r)).
-  replace (μeval _ _ _) with (Finite 1%R) in Hrel; revgoals.
+  specialize (Hrel 1 ltac:(auto) _ _ (Measurable_Singleton r) (Krel_Knil_refl _)).
+  replace (μeval _ _ _ _) with (Finite 1%R) in Hrel; revgoals.
   { unfold μeval.
     cbn.
     repeat setoid_rewrite integrate_entropy_const.
@@ -175,7 +169,7 @@ Proof.
     f_equal.
     ring.
   }
-  replace (μeval_star _ _) with (Finite 0%R) in Hrel; revgoals.
+  replace (μeval_star _ _ _) with (Finite 0%R) in Hrel; revgoals.
   { unfold μeval_star.
     unfold eval_star.
     do 2 setoid_rewrite <- Lim_seq_incr_1.
@@ -195,13 +189,13 @@ Proof.
   intros Hrel.
   unfold Erel, Erel' in Hrel.
   destruct Hrel as [Hclosed_b [Hclosed_r Hrel]].
-  remember ((Op1 Realp (Var 0)) -: (Knil (Measurable_Singleton 0))) as K.
+  remember ((Op1 Realp (Var 0)) -: Knil) as K.
   assert (Krel (3 + n) K K) as HK.
   { apply Krel_Fundamental_closed.
     subst.
     repeat constructor.
   }
-  specialize (Hrel _ ltac:(auto) _ _ HK).
+  specialize (Hrel _ ltac:(auto) _ _ (Measurable_Singleton 0) HK).
   subst.
   clear HK.
   cbn in Hrel.
@@ -249,13 +243,13 @@ Proof.
   }
   { repeat constructor.
   }
-  intros m Hmn K1 K2 HKrel.
+  intros m Hmn K1 K2 A HKrel.
   rewrite μeval_star_loop_0.
   pose proof (succ_ValScoped Hclosed_v).
   destruct (Krel_closed HKrel) as [Hclosed_K1 Hclosed_K2].
-  specialize (Hrel (2 + m) (ltac:(auto)) _ _
+  specialize (Hrel (2 + m) (ltac:(auto)) _ _ A
                    (Krel_Fundamental_closed (App (Var 0) v-:K1) _ ltac:(auto))).
-  replace (μeval_star _ _) with (Finite 0%R) in Hrel;
+  replace (μeval_star _ _ _) with (Finite 0%R) in Hrel;
     revgoals.
   { unfold μeval_star.
     unfold eval_star.
@@ -286,7 +280,7 @@ Proof.
 
   unfold Erel, Erel' in H.
   destruct H as [Hclosed_r1 [Hclosed_r2 HErel]].
-  specialize (HErel 1 ltac:(auto) _ _ (Krel_singleton_related 1 r1)).
+  specialize (HErel 1 ltac:(auto) _ _ (Measurable_Singleton r1) (Krel_Knil_refl 1)).
 
   unfold μeval in HErel.
   cbn in HErel.
@@ -342,7 +336,7 @@ Proof.
       - apply @Vrel_downclosed with (n:=m); auto.
       - auto.
     } 
-    specialize (H1 (2 + m0) ltac:(auto) _ _ H6).
+    specialize (H1 (2 + m0) ltac:(auto) _ _ A H6).
     subst.
     cbn in H1.
     run_μeval in H1; asimpl in H1.
@@ -447,8 +441,8 @@ Proof.
     specialize (H0 γ H1).
     unfold CIU in *.
     intuition idtac.
-    specialize (H5 K H4).
-    specialize (H6 K H4).
+    specialize (H5 K A H4).
+    specialize (H6 K A H4).
     eapply Rbar_le_trans; eauto.
   - unfold CompatibleFun.
     intros.
@@ -935,8 +929,8 @@ Definition CTX (Γ : Env) (e1 e2 : Expr) :=
   (EXP Γ ⊢ e1 /\ EXP Γ ⊢ e2) /\
   (forall (C : Ctx) A,
       EECTX Γ ⊢ C ∷ 0 ->
-      Rbar_le (μeval_star (plug C e1) (Knil A))
-              (μeval_star (plug C e2) (Knil A))).
+      Rbar_le (μeval_star (plug C e1) Knil A)
+              (μeval_star (plug C e2) Knil A)).
 
 Lemma CTX_bigger : forall R' : Env -> Expr -> Expr -> Prop,
     IsPreCtxRel R' -> forall (Γ : Env) (e1 e2 : Expr), R' Γ e1 e2 -> CTX Γ e1 e2.
@@ -1017,8 +1011,8 @@ Lemma use_Seq_instead : forall Γ e v C A,
     EXP S Γ ⊢ e ->
     VAL Γ ⊢ v ->
     EECTX Γ ⊢ C ∷ 0 ->
-    μeval_star (plug C (Seq v e)) (Knil A) =
-    μeval_star (plug C e.[v/]) (Knil A).
+    μeval_star (plug C (Seq v e)) Knil A =
+    μeval_star (plug C e.[v/]) Knil A.
 Proof.
   intros.
   pose proof CTX_bigger.
@@ -1127,8 +1121,8 @@ Proof.
     assert (forall f1 v1,
                VAL Γ ⊢ f1 ->
                VAL Γ ⊢ v1 ->
-               (μeval_star (plug C (App f1 v1)) (Knil A) =
-                μeval_star (plug C (Seq f1 (App (Var 0) (rename (+1) v1)))) (Knil A)))
+               (μeval_star (plug C (App f1 v1)) Knil A =
+                μeval_star (plug C (Seq f1 (App (Var 0) (rename (+1) v1)))) Knil A))
       as HApp_Seq_f.
     { intros.
       erewrite use_Seq_instead; eauto 2.
@@ -1142,8 +1136,8 @@ Proof.
     assert (forall f1 v1,
                VAL Γ ⊢ f1 ->
                VAL Γ ⊢ v1 ->
-               (μeval_star (plug C (App f1 v1)) (Knil A) =
-                μeval_star (plug C (Seq v1 (App (rename (+1) f1) (Var 0)))) (Knil A)))
+               (μeval_star (plug C (App f1 v1)) Knil A =
+                μeval_star (plug C (Seq v1 (App (rename (+1) f1) (Var 0)))) Knil A))
       as HApp_Seq_v.
     { intros.
       erewrite use_Seq_instead; eauto 2.
@@ -1193,8 +1187,8 @@ Proof.
     cbn in H3.
     assert (forall v1,
                VAL Γ ⊢ v1 ->
-               (μeval_star (plug C (Op1 o v1)) (Knil A) =
-                μeval_star (plug C (Seq v1 (Op1 o (Var 0)))) (Knil A)))
+               (μeval_star (plug C (Op1 o v1)) Knil A =
+                μeval_star (plug C (Seq v1 (Op1 o (Var 0)))) Knil A))
       as HApp_Op1.
     { intros.
       erewrite use_Seq_instead; eauto 2.
@@ -1224,8 +1218,8 @@ Proof.
     cbn in H6.
     assert (forall v1,
                VAL Γ ⊢ v1 ->
-               (μeval_star (plug C (Op2 o v1 v1')) (Knil A) =
-                μeval_star (plug C (Seq v1 (Op2 o (Var 0) (rename (+1) v1')))) (Knil A)))
+               (μeval_star (plug C (Op2 o v1 v1')) Knil A =
+                μeval_star (plug C (Seq v1 (Op2 o (Var 0) (rename (+1) v1')))) Knil A))
       as HApp_Op2_1.
     { intros.
       erewrite use_Seq_instead; eauto 2.
@@ -1240,8 +1234,8 @@ Proof.
     }
     assert (forall v1',
                VAL Γ ⊢ v1' ->
-               (μeval_star (plug C (Op2 o v2 v1')) (Knil A) =
-                μeval_star (plug C (Seq v1' (Op2 o (rename (+1) v2) (Var 0)))) (Knil A)))
+               (μeval_star (plug C (Op2 o v2 v1')) Knil A =
+                μeval_star (plug C (Seq v1' (Op2 o (rename (+1) v2) (Var 0)))) Knil A))
       as HApp_Op2_2.
     { intros.
       erewrite use_Seq_instead; eauto 2.
@@ -1324,8 +1318,8 @@ Proof.
     cbn in H9.
     assert (forall vp,
                VAL Γ ⊢ vp ->
-               (μeval_star (plug C (Cond vp et2 ef2)) (Knil A) =
-                μeval_star (plug C (Seq vp (Cond (Var 0) (rename (+1) et2) (rename (+1) ef2)))) (Knil A)))
+               (μeval_star (plug C (Cond vp et2 ef2)) Knil A =
+                μeval_star (plug C (Seq vp (Cond (Var 0) (rename (+1) et2) (rename (+1) ef2)))) Knil A))
       as HSeq_Cond_p.
     { intros.
       erewrite use_Seq_instead; eauto 2.
@@ -1386,8 +1380,8 @@ Proof.
     cbn in H3.
     assert (forall v1,
                VAL Γ ⊢ v1 ->
-               (μeval_star (plug C (Factor v1)) (Knil A) =
-                μeval_star (plug C (Seq v1 (Factor (Var 0)))) (Knil A)))
+               (μeval_star (plug C (Factor v1)) Knil A =
+                μeval_star (plug C (Seq v1 (Factor (Var 0)))) Knil A))
       as HFactor_Seq.
     { intros.
       erewrite use_Seq_instead; eauto 2.
@@ -1477,14 +1471,15 @@ Proof.
       induction K; intros.
       * apply HR'.
         auto.
-      * replace (μeval_star e1 _)
-          with (μeval_star (Seq e1 e) K);
+      * replace (μeval_star e1 _ _)
+          with (μeval_star (Seq e1 e) K A);
           revgoals.
-        { run_μeval_star_for 1.
+        {
+          run_μeval_star_for 1.
           auto.
         }
-        replace (μeval_star e2 _)
-          with (μeval_star (Seq e2 e) K);
+        replace (μeval_star e2 _ A)
+          with (μeval_star (Seq e2 e) K A);
           revgoals.
         { run_μeval_star_for 1.
           auto.

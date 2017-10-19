@@ -94,7 +94,7 @@ Local Hint Constructors K_gt.
 Definition ConfigClosed c :=
   match c with
   | mkConfiguration (Configuration_more _ e K _) _ => ECLOSED e /\ KCLOSED K
-  | mkConfiguration Configuration_done _ => True
+  | mkConfiguration (Configuration_done _) _ => True
   end.
 
 Lemma step_closed : forall c,
@@ -145,7 +145,7 @@ Proof.
          destruct K;
          try destruct e1;
          try (destruct e; auto;
-              destruct Rle_dec; auto);
+              destruct Rlt_dec; auto);
          try
          auto;
          apply IHn;
@@ -188,9 +188,9 @@ Proof.
       repeat (constructor; eauto).
 Qed.
 
-Fixpoint Kont_end (K : Kont) (σ : Entropy) : Measurable R * Entropy :=
+Fixpoint Kont_end (K : Kont) (σ : Entropy) : Entropy :=
   match K with
-  | Knil A => (A, σ)
+  | Knil => σ
   | Kcons e K' => Kont_end K' (Entropy_π2 σ)
   end.
 
@@ -209,10 +209,10 @@ Proof.
     auto.
 Qed.
 
-Lemma run_Knil_determined : forall {n σ1 e1 A1 σ1' w1
-                                      σ2 e2 A2 σ2' w2},
-    run n ⟨ σ1 | e1 | Knil A1 | σ1' | w1 ⟩ = Some ⟨ σ2 | e2 | Knil A2 | σ2' | w2 ⟩ ->
-    A1 = A2 /\ σ1' = σ2'.
+Lemma run_Knil_determined : forall {n σ1 e1 σ1' w1
+                                      σ2 e2 σ2' w2},
+    run n ⟨ σ1 | e1 | Knil | σ1' | w1 ⟩ = Some ⟨ σ2 | e2 | Knil | σ2' | w2 ⟩ ->
+    σ1' = σ2'.
 Proof.
   intros.
   apply run_Kont_determined in H.
@@ -246,9 +246,9 @@ Proof.
   left; intuition.
 Qed.
 
-Lemma run_fixpoint : forall n c w,
-    run n c = Some ⟨ w ⟩ ->
-    run (S n) c = Some ⟨ w ⟩.
+Lemma run_fixpoint : forall n c v w,
+    run n c = Some ⟨ v@w ⟩ ->
+    run (S n) c = Some ⟨ v@w ⟩.
 Proof.
   intros.
   replace (S n) with (n + 1) by auto.
@@ -314,7 +314,7 @@ Proof.
            erewrite run_transitive in HcSi; revgoals; eauto;
            cbn in HcSi;
            try (inversion H2; subst; auto);
-           try (destruct Rle_dec; auto);
+           try (destruct Rlt_dec; auto);
            inversion HcSi; subst;
            inversion H; subst; auto].
     - right.                    (* Op1: not a value *)
@@ -329,13 +329,6 @@ Proof.
       destruct o, v1, v2; auto; cbn in HcSi;
         try destruct Req_EM_T;
         try destruct Rle_dec;
-        try destruct Rlt_dec;
-        cbn in HcSi; auto;
-          inversion HcSi; subst; auto.
-    - right.                    (* Cond: not a value *)
-      replace (S i) with (i + 1) in HcSi by auto.
-      erewrite run_transitive in HcSi; eauto.
-      destruct vp; auto; cbn in HcSi;
         try destruct Rlt_dec;
         cbn in HcSi; auto;
           inversion HcSi; subst; auto.
@@ -393,15 +386,15 @@ Qed.
 
 (* Theorem 4.5 {thm-interpolation} *)
 Theorem interpolation : forall σ1 e1 K1 σ1' w1
-                               σ3 e3 A3 σ3' w3 n,
+                               σ3 e3 σ3' w3 n,
     ECLOSED e1 ->
     KCLOSED K1 ->
     VCLOSED e3 ->
-    run n ⟨σ1|e1|K1|σ1'|w1⟩ = Some ⟨σ3|e3|Knil A3|σ3'|w3⟩ ->
+    run n ⟨σ1|e1|K1|σ1'|w1⟩ = Some ⟨σ3|e3|Knil|σ3'|w3⟩ ->
     exists_least j, exists σ2 v w2,
       VCLOSED v /\
       run j ⟨σ1|e1|K1|σ1'|w1⟩ = Some ⟨σ2|v|K1|σ1'|w2⟩ /\
-      run (n-j) ⟨σ2|v|K1|σ1'|w2⟩ = Some ⟨σ3|e3|Knil A3|σ3'|w3⟩.
+      run (n-j) ⟨σ2|v|K1|σ1'|w2⟩ = Some ⟨σ3|e3|Knil|σ3'|w3⟩.
 Proof.
   intros.
   apply find_smallest_alt; revgoals.
@@ -474,7 +467,7 @@ Proof.
     auto.
   }
   assert (decidable (run (n - n0) ⟨ σ | e | K1 | σ1' | w ⟩ =
-                     Some ⟨ σ3 | e3 | Knil A3 | σ3' | w3 ⟩)).
+                     Some ⟨ σ3 | e3 | Knil | σ3' | w3 ⟩)).
   { remember (run (n - n0) ⟨ σ | e | K1 | σ1' | w ⟩) as c.
     destruct c; [|right; intro; solve_inversion].
     destruct c.
@@ -487,7 +480,7 @@ Proof.
       [|right; intro Hfalse; inversion Hfalse];
       subst;
       auto.
-    destruct (Kont_eq_dec K0 (Knil A3));
+    destruct (Kont_eq_dec K0 Knil);
       [|right; intro Hfalse; inversion Hfalse];
       subst;
       auto.
@@ -547,7 +540,7 @@ Inductive RR (K1 K2 : Kont) (τ1 τ2 : Entropy) (r: R) :
 
 Fixpoint Kont_length (K : Kont) : nat :=
   match K with
-  | Knil A => 0
+  | Knil => 0
   | Kcons e K' => S (Kont_length K')
   end.
 
@@ -694,7 +687,7 @@ Proof.
       * cbn.
         cbn in HSi_c2'.
         destruct e0; try solve_inversion.
-        destruct Rle_dec; try solve_inversion.
+        destruct Rlt_dec; try solve_inversion.
         replace (w * (w2 / w1) * r)%R with (w * r * (w2 / w1))%R by ring.
         constructor.
         constructor.
@@ -768,7 +761,7 @@ Proof.
           auto.
       * cbn in *.
         destruct e0; try solve_inversion.
-        destruct Rle_dec; try solve_inversion.
+        destruct Rlt_dec; try solve_inversion.
         replace (w * (w2 / w1) * r)%R with (w * r * (w2 / w1))%R by ring.
         constructor.
         constructor.

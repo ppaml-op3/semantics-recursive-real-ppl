@@ -416,6 +416,36 @@ Proof.
       intros.
       apply μeval_step_Op2_Le_0;  auto using Rnot_le_lt.
       apply H5; auto.
+  + replace (μeval m _ K1 A) with (Finite 0);
+      auto.
+    destruct m; auto.
+    * rewrite μeval_0; auto.
+    * unfold μeval.
+      unfold eval.
+      destruct o;
+        cbn;
+        repeat rewrite integrate_0;
+        auto.
+  + replace (μeval m _ K1 A) with (Finite 0);
+      auto.
+    destruct m; auto.
+    * rewrite μeval_0; auto.
+    * unfold μeval.
+      unfold eval.
+      destruct o;
+        cbn;
+        repeat rewrite integrate_0;
+        auto.
+  + replace (μeval m _ K1 A) with (Finite 0);
+      auto.
+    destruct m; auto.
+    * rewrite μeval_0; auto.
+    * unfold μeval.
+      unfold eval.
+      destruct o;
+        cbn;
+        repeat rewrite integrate_0;
+        auto.
 Qed.
 
 Hint Resolve Erel_Op2_compatible_closed.
@@ -479,6 +509,15 @@ Proof.
       intros.
       apply μeval_step_Cond_false; auto using Rnot_lt_le.
       apply H1; eauto.
+  + replace (μeval m _ K1 A) with (Finite 0);
+      auto.
+    destruct m; auto.
+    * rewrite μeval_0; auto.
+    * unfold μeval.
+      unfold eval.
+      cbn.
+      repeat rewrite integrate_0.
+      auto.
 Qed.
 
 Hint Resolve Erel_Cond_compatible_closed.
@@ -501,8 +540,8 @@ Hint Resolve Erel_Cond_compatible.
 (* Lemma 9 *)
 
 (* Lemma 9 *)
-Lemma Krel_Knil_refl : forall n A,
-    Krel n (Knil A) (Knil A).
+Lemma Krel_Knil_refl : forall n,
+    Krel n Knil Knil.
 Proof.
   intros.
   unfold Krel, Krel'.
@@ -535,8 +574,8 @@ Proof.
     eauto;
     revgoals;
     try solve [run_μeval_for 1].
-  destruct (Rbar_le_dec 0%R r); revgoals.
-  { replace (μeval m (Factor (Const r)) K1)
+  destruct (Rbar_lt_dec 0%R r); revgoals.
+  { replace (μeval m (Factor (Const r)) K1 A)
       with (Finite 0%R).
     apply μeval_star_nonnegative.
     unfold μeval.
@@ -549,17 +588,17 @@ Proof.
     destruct m; auto.
     unfold eval.
     cbn.
-    destruct Rle_dec; try contradiction; auto.
+    destruct Rlt_dec; try contradiction; auto.
   }
   run_μeval_for 1.
-  replace (μeval_star _ _) with (Rbar_mult r (μeval_star (Const r) K2)).
-  { apply Rbar_mult_le_compat_l; auto.
+  replace (μeval_star _ _ _) with (Rbar_mult r (μeval_star (Const r) K2 A)).
+  { apply Rbar_mult_le_compat_l; cbn in *; auto.
     apply H0; eauto.
   }
   rewrite μeval_lim_interchange with (e:=(Factor _)).
   rewrite Sup_seq_incr_1; auto.
-  setoid_rewrite (μeval_step_Factor _ _ _ r0).
-  rewrite Sup_seq_scal_l; auto.
+  setoid_rewrite (μeval_step_Factor _ _ _ _ r0).
+  rewrite Sup_seq_scal_l; cbn in *; auto.
   rewrite <- μeval_lim_interchange.
   auto.
 Qed.

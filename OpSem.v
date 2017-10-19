@@ -25,19 +25,20 @@ Open Scope R.
 (*** Operational Semantics *)
 
 Inductive UnweightedConfiguration : Type :=
-| Configuration_done : UnweightedConfiguration
+| Configuration_done : forall (v : R),
+    UnweightedConfiguration
 | Configuration_more : forall (σ : Entropy) (e : Expr) (K : Kont) (σK : Entropy),
     UnweightedConfiguration.
 
 Inductive Configuration : Type :=
 | mkConfiguration : forall (c : UnweightedConfiguration) (w : R),
     Configuration.
-
+ 
 Notation "⟨ c | w ⟩" := (mkConfiguration c w).
-
+ 
 Notation "⟨ σ | e | K | σK | w ⟩" := (⟨ Configuration_more σ e K σK | w ⟩).
 
-Notation "⟨ r ⟩" := (mkConfiguration Configuration_done r).
+Notation "⟨ v @ r ⟩" := (mkConfiguration (Configuration_done v) r).
 
 Axiom Rexp : R -> R.
 Axiom Rlog : R -> R.
@@ -80,18 +81,18 @@ Definition δ2 (o : EOp2) (v1 v2 : Expr) : option Expr :=
 
 Definition step (c : Configuration) : option Configuration :=
   match c with
-  | mkConfiguration Configuration_done r => None
+  | mkConfiguration (Configuration_done v) r => None
   | mkConfiguration (Configuration_more σ e K σK) w =>
     match e with
     | Var x => None
     | Const r =>
       match K with
-      | Knil A => Some ⟨ (Indicator A r) * w ⟩
+      | Knil => Some ⟨ r @ w ⟩
       | e'-:K' => Some ⟨ Entropy_π1 σK | e'.[Const r/] | K' | Entropy_π2 σK | w ⟩
       end
     | Fun b =>
       match K with
-      | Knil A => None
+      | Knil => None
       | e'-:K' => Some ⟨ Entropy_π1 σK | e'.[Fun b/] | K' | Entropy_π2 σK | w ⟩
       end
     | App (Fun b) v => Some ⟨ σ | b.[v/] | K | σK | w ⟩
@@ -115,7 +116,7 @@ Definition step (c : Configuration) : option Configuration :=
     | Cond _ _ _ => None
     | Sample => Some ⟨ Entropy_π1 σ | Const (Entropy_extract (Entropy_π2 σ)) | K | σK | w ⟩
     | Factor (Const r) =>
-      match Rle_dec 0 r with
+      match Rlt_dec 0 r with
       | in_left => Some ⟨ σ | Const r | K | σK | w * r ⟩
       | in_right => None
       end
@@ -220,7 +221,7 @@ Proof.
         try (inversion H2; subst; clear H2);
           intuition auto.
   - destruct e1; auto.
-    destruct Rle_dec; auto.
+    destruct Rlt_dec; auto.
     inversion H1; subst; clear H1.
     eauto.
 Qed.
@@ -234,15 +235,9 @@ Proof.
   destruct c1, c2;
     try solve [inversion Hstep].
   - solve_step e K Hstep.
-    destruct K;
-      inversion Hstep.
-    destruct (Indicator_range A r0) as [Hindicator|Hindicator];
-      rewrite Hindicator;
-      cbn in *;
-      auto.
   - solve_step e K Hstep.
     cbn in *.
-    destruct Rle_dec;
+    destruct Rlt_dec;
       inversion Hstep;
       subst.
     apply Rmult_le_pos;
@@ -256,18 +251,12 @@ Proof.
   intros.
   destruct c; auto.
   solve_step e K H.
-  - destruct K; cbn in H;
-      inversion H; subst;
-        cbn;
-        f_equal;
-        f_equal;
-        ring.
-  - cbn in *.
-    destruct Rle_dec; auto.
-    inversion H; subst; clear H.
-    f_equal.
-    f_equal.
-    ring.
+  cbn in *.
+  destruct Rlt_dec; auto.
+  inversion H; subst; clear H.
+  f_equal.
+  f_equal.
+  ring.
 Qed.
 
 (* n or fewer steps *)
@@ -276,7 +265,7 @@ Fixpoint run (n : nat) (c : Configuration) : option Configuration :=
   | 0%nat => Some c
   | S n' =>
     match c with
-    | ⟨r⟩ => Some ⟨r⟩
+    | ⟨v@r⟩ => Some ⟨v@r⟩
     | _ => match step c with
            | None => None
            | Some c' => run n' c'
@@ -335,8 +324,8 @@ Ltac solve_run e K n H :=
        eauto].
 
 
-Lemma run_done : forall n r,
-    run n ⟨r⟩ = Some ⟨r⟩.
+Lemma run_done : forall n v r,
+    run n ⟨v@r⟩ = Some ⟨v@r⟩.
 Proof.
   destruct n;
     auto.
@@ -458,13 +447,13 @@ Proof.
       eapply IHn; eauto.
 Qed.
 
-Definition eval (n : nat) (c : Configuration) : R :=
+Definition eval (A : Measurable R) (n : nat) (c : Configuration) : R :=
   match run n c with
-  | Some ⟨r⟩ => r
+  | Some ⟨v@r⟩ => Indicator A v * r
   | _ => 0
   end.
 
-Lemma eval_done : forall n r, eval n ⟨r⟩ = r.
+Lemma eval_done : forall n v r A, eval A n ⟨v@r⟩ = Indicator A v * r.
 Proof.
   destruct n;
     auto.
@@ -473,34 +462,56 @@ Qed.
 Hint Resolve eval_done.
 
 (* Lemma 4.1 part 1 *)
-Lemma eval_step : forall n c1 c2,
+Lemma eval_step : forall A n c1 c2,
     step c1 = Some c2 ->
-    eval (S n) c1 = eval n c2.
+    eval A (S n) c1 = eval A n c2.
 Proof.
-  intros n c1 c2 Hstep.
+  intros A n c1 c2 Hstep.
   destruct c1 as [[|σ e K] w1];
     auto.
   unfold eval in *.
   solve_step e K Hstep.
 Qed.
 
-Lemma eval_weight_nonnegative : forall n c w,
+Lemma Indicator_nonnegative : forall A (v : R),
+    0 <= Indicator A v.
+Proof.
+  intros.
+  destruct (Indicator_range A v);
+    auto.
+Qed.
+  
+Lemma Rmult_Indicator_nonnegative : forall A (v : R) w,
     0 <= w ->
-    0 <= eval n ⟨c|w⟩.
+    0 <= Indicator A v * w.
+Proof.
+  intros.
+  apply Rmult_le_pos;
+    auto using Indicator_nonnegative.
+Qed.
+
+Hint Resolve Rmult_Indicator_nonnegative.
+
+Lemma eval_weight_nonnegative : forall A n c w,
+    0 <= w ->
+    0 <= eval A n ⟨c|w⟩.
 Proof.
   intros.
   unfold eval in *.
   remember (run n ⟨c|w⟩) as c' eqn:Hc'.
   destruct c' as [[[|? ? ?] ?]|]; auto.
-  eapply run_weight_nonnegative;
-    eauto.
+  apply Rmult_le_pos.
+  - destruct (Indicator_range A v);
+      auto.
+  - eapply run_weight_nonnegative;
+      eauto.
 Qed.
 
-Definition eval_star (c : Configuration) : Rbar :=
-  Lim_seq (fun n => eval n c).
+Definition eval_star (A : Measurable R) (c : Configuration) : Rbar :=
+  Lim_seq (fun n => eval A n c).
 
-Lemma eval_star_done : forall r,
-    eval_star ⟨r⟩ = r.
+Lemma eval_star_done : forall A v r,
+    eval_star A ⟨v@r⟩ = Indicator A v * r.
 Proof.
   intros.
   unfold eval_star.
@@ -538,14 +549,16 @@ Proof.
 Qed.
 
 (* Lemma 4.1 part 2. *)
-Lemma eval_star_step : forall c1 c2,
+Lemma eval_star_step : forall A c1 c2,
     step c1 = Some c2 ->
-    eval_star c1 = eval_star c2.
+    eval_star A c1 = eval_star A c2.
 Proof.
   intros.
   unfold eval_star in *.
   rewrite <- Lim_seq_incr_1.
   apply Lim_seq_ext.
+  intros.
+  eapply eval_step.
   auto using eval_step.
 Qed.
 
@@ -592,14 +605,14 @@ Proof.
           firstorder idtac.
       * cbn in *.
         destruct e; cbn; auto.
-        destruct Rle_dec; cbn; auto.
+        destruct Rlt_dec; cbn; auto.
         destruct K; cbn; auto;
         firstorder idtac.
 Qed.
 
-Lemma run_index_monotonic_Some : forall n c r,
-    run n c = Some ⟨r⟩ ->
-    run (S n) c = Some ⟨r⟩.
+Lemma run_index_monotonic_Some : forall n c v r,
+    run n c = Some ⟨v@r⟩ ->
+    run (S n) c = Some ⟨v@r⟩.
 Proof.
   intros.
   replace (S n) with (n + 1)%nat by auto.
@@ -608,9 +621,9 @@ Proof.
   auto.
 Qed.
 
-Lemma eval_index_monotonic_1 : forall n c w,
+Lemma eval_index_monotonic_1 : forall A n c w,
     0 <= w ->
-    eval n ⟨c|w⟩ <= eval (S n) ⟨c|w⟩.
+    eval A n ⟨c|w⟩ <= eval A (S n) ⟨c|w⟩.
 Proof.
   intros.
   unfold eval.
@@ -625,36 +638,36 @@ Proof.
         symmetry in Hrun_Sn.
       destruct s as [c'|]; auto using Rle_refl.
       destruct c' as [[|? ? ?] ?]; auto using Rle_refl.
-      pose proof (run_weight_nonnegative (S n) c w Configuration_done w1 H).
+      pose proof (run_weight_nonnegative (S n) c w (Configuration_done v) w1 H).
       auto.
   - rewrite run_index_monotonic_None;
       auto using Rle_refl.
 Qed.
 
-Lemma eval_index_monotonic : forall n m (Hnm : (n <= m)%nat) c w,
+Lemma eval_index_monotonic : forall A n m (Hnm : (n <= m)%nat) c w,
     0 <= w ->
-    eval n ⟨c|w⟩ <= eval m ⟨c|w⟩.
+    eval A n ⟨c|w⟩ <= eval A m ⟨c|w⟩.
 Proof.
   induction 1; intros;
     eauto using Rle_trans, eval_index_monotonic_1.
 Qed.
 
-Lemma eval_step_monotonic : forall n c w c' w',
+Lemma eval_step_monotonic : forall A n c w c' w',
     0 <= w ->
     step ⟨c|w⟩ = Some ⟨c'|w'⟩ ->
-    eval n ⟨c|w⟩ <= eval n ⟨c'|w'⟩.
+    eval A n ⟨c|w⟩ <= eval A n ⟨c'|w'⟩.
 Proof.
   destruct n; intros.
   - pose proof (step_weight_nonnegative _ _ _ _ H H0).
-    destruct c, c'; auto using Rle_refl.
+    destruct c, c'; cbn; auto using Rle_refl.
   - erewrite eval_step by eauto.
     eauto using eval_index_monotonic, step_weight_nonnegative. 
 Qed.
 
 (* Lemma 4.2 part 1 *)
-Lemma run_weight_linear : forall n σ e K σK r r',
-    run n ⟨ σ | e | K | σK | r ⟩ = Some ⟨r'⟩ <->
-    (forall w, w > 0 -> run n ⟨ σ | e | K | σK | w * r ⟩ = Some ⟨w * r'⟩).
+Lemma run_weight_linear : forall n σ e K σK v r r',
+    run n ⟨ σ | e | K | σK | r ⟩ = Some ⟨v@r'⟩ <->
+    (forall w, w > 0 -> run n ⟨ σ | e | K | σK | w * r ⟩ = Some ⟨v@w * r'⟩).
 Proof.
   induction n;
     split;
@@ -668,35 +681,25 @@ Proof.
     auto.
   }
   {
-    assert (forall (σ : Entropy) (e : Expr) (K : Kont) (σK : Entropy) (r r' : R),
-               run n ⟨ σ | e | K | σK | r ⟩ = Some ⟨ r' ⟩ ->
-               (forall w : R, w > 0 -> run n ⟨ σ | e | K | σK | w * r ⟩ = Some ⟨ w * r' ⟩))
+    assert (forall (σ : Entropy) (e : Expr) (K : Kont) (σK : Entropy) v (r r' : R),
+               run n ⟨ σ | e | K | σK | r ⟩ = Some ⟨ v@r' ⟩ ->
+               (forall w : R, w > 0 -> run n ⟨ σ | e | K | σK | w * r ⟩ = Some ⟨ v@w * r' ⟩))
       by (apply IHn).
     solve_run e K n H.
-    - destruct K;
-        cbn in *;
-        auto.
-      destruct n;
-        inversion H;
-        subst;
-        cbn in *;
-        f_equal;
-        f_equal;
-        ring.
-    - cbn in *.
-      try destruct Rle_dec;
-        auto.
-      eapply IHn in H;
-        eauto.
-      replace (w * r * r0)
-        with (w * (r * r0))
-        by ring.
+    cbn in *.
+    try destruct Rlt_dec;
+      auto.
+    eapply IHn in H;
       eauto.
+    replace (w * r * r0)
+      with (w * (r * r0))
+      by ring.
+    eauto.
   }
   { assert 
-      (forall (σ : Entropy) (e : Expr) (K : Kont) (σK : Entropy) (r r' : R),
-          (forall w, w > 0 -> run n ⟨ σ | e | K | σK | w * r ⟩ = Some ⟨ w * r' ⟩) ->
-          run n ⟨ σ | e | K | σK | r ⟩ = Some ⟨ r' ⟩)
+      (forall (σ : Entropy) (e : Expr) (K : Kont) (σK : Entropy) v (r r' : R),
+          (forall w, w > 0 -> run n ⟨ σ | e | K | σK | w * r ⟩ = Some ⟨ v@w * r' ⟩) ->
+          run n ⟨ σ | e | K | σK | r ⟩ = Some ⟨ v@r' ⟩)
       by (apply IHn).
     specialize (H 1).
     replace (1 * r) with r in H by ring.
@@ -707,9 +710,9 @@ Proof.
 Qed.
 
 (* Lemma 4.2 part 1 (as stated in paper) *)
-Lemma run_weight_linear_alt : forall n σ e K σK w',
-    run n ⟨ σ | e | K | σK | 1 ⟩ = Some ⟨w'⟩ <->
-    (forall w, w > 0 -> run n ⟨ σ | e | K | σK | w ⟩ = Some ⟨w' * w⟩).
+Lemma run_weight_linear_alt : forall n σ e K σK v w',
+    run n ⟨ σ | e | K | σK | 1 ⟩ = Some ⟨v@w'⟩ <->
+    (forall w, w > 0 -> run n ⟨ σ | e | K | σK | w ⟩ = Some ⟨v@w' * w⟩).
 Proof.
   split; intros.
   - apply run_weight_linear with (w:=w) in H; auto.
@@ -770,7 +773,7 @@ Proof.
         destruct K in H; auto.
         eapply IHn; eauto.
       * cbn in H.
-        destruct Rle_dec; auto.
+        destruct Rlt_dec; auto.
         replace (0 * r) with 0 in H by ring.
         eapply IHn.
         eauto.
@@ -798,36 +801,21 @@ Proof.
                field; eauto].
   solve_run e K n H0.
   + destruct K; cbn in *; auto.
-    rewrite run_done in H0.
-    inversion H0; subst; clear H0.
-    destruct n; cbn;
-      f_equal;
-      f_equal;
-      field;
-      auto.
   + destruct K; cbn in *; auto.
   + cbn in *.
-    destruct (Rle_dec 0 r0); auto.
-    destruct (Rlt_dec 0 r0).
-    * assert (r0 <> 0).
-      { intro; subst.
-        auto.
-      }
-      replace (r2/r) with ((r2*r0)/(r*r0)) by (field; auto).
-      eapply IHn.
-      eapply Rmult_integral_contrapositive; intuition.
-      eapply H0.
-    * assert (r0 = 0) by (inversion r1; auto); subst.
-      replace (r*0) with 0 in H0 by ring.
-      replace (r2*0) with 0 by ring.
-      pose proof (run_weight_0 _ _ _ _ H0); subst.
-      replace (r2 / r * 0) with 0 by (field; auto).
-      auto.
+    destruct (Rlt_dec 0 r0); auto.
+    eapply IHn in H0.
+    * replace (r2/r) with ((r2*r0)/(r*r0)).
+      apply H0.
+      field.
+      intuition.
+    * apply Rmult_integral_contrapositive.
+      split; auto. 
 Qed.
 
-Lemma run_Some_done : forall n σ e K σK r r',
-    run n ⟨ σ | e | K | σK | r ⟩ = Some ⟨ r' ⟩ ->
-    forall r2, exists r2', run n ⟨ σ | e | K | σK | r2 ⟩ = Some ⟨ r2' ⟩.
+Lemma run_Some_done : forall n σ e K σK v r r',
+    run n ⟨ σ | e | K | σK | r ⟩ = Some ⟨ v@r' ⟩ ->
+    forall r2, exists r2', run n ⟨ σ | e | K | σK | r2 ⟩ = Some ⟨ v@r2' ⟩.
 Proof.
   induction n;
     intros.
@@ -835,17 +823,17 @@ Proof.
   - solve_run e K n H.
 Qed.
 
-Lemma step_Some_done : forall σ e K σK r r',
-    step ⟨ σ | e | K | σK | r ⟩ = Some ⟨ r' ⟩ ->
-    forall r2, exists r2', step ⟨ σ | e | K | σK | r2 ⟩ = Some ⟨ r2' ⟩.
+Lemma step_Some_done : forall σ e K σK v r r',
+    step ⟨ σ | e | K | σK | r ⟩ = Some ⟨ v@r' ⟩ ->
+    forall r2, exists r2', step ⟨ σ | e | K | σK | r2 ⟩ = Some ⟨ v@r2' ⟩.
 Proof.
   intros.
   solve_step e K H.
 Qed.
 
 (* Lemma 4.2 part 2 *)
-Lemma eval_weight_linear : forall n c w r,
-    eval n ⟨c|w*r⟩ = w * eval n ⟨c|r⟩.
+Lemma eval_weight_linear : forall A n c w r,
+    eval A n ⟨c|w*r⟩ = w * eval A n ⟨c|r⟩.
 Proof.
   induction n; intros.
   - destruct c; cbn; ring.
@@ -871,8 +859,8 @@ Proof.
 Qed.
 
 (* Lemma 4.2 part 2 (as stated in paper) *)
-Lemma eval_weight_linear_alt : forall n c w,
-    eval n ⟨c|w⟩ = w * eval n ⟨c|1⟩.
+Lemma eval_weight_linear_alt : forall A n c w,
+    eval A n ⟨c|w⟩ = w * eval A n ⟨c|1⟩.
 Proof.
   intros.
   replace w with (w*1) at 1 by ring.
@@ -880,8 +868,8 @@ Proof.
 Qed.
 
 (* Lemma 4.2 part 2 *)
-Lemma eval_star_weight_linear : forall σ e K σK w r,
-    eval_star ⟨σ|e|K|σK|w*r⟩ = Rbar_mult w (eval_star ⟨σ|e|K|σK|r⟩).
+Lemma eval_star_weight_linear : forall A σ e K σK w r,
+    eval_star A ⟨σ|e|K|σK|w*r⟩ = Rbar_mult w (eval_star A ⟨σ|e|K|σK|r⟩).
 Proof.
   intros.
   unfold eval_star.
@@ -892,8 +880,8 @@ Proof.
 Qed.
 
 (* Lemma 4.2 part 2 (as stated in paper) *)
-Lemma eval_star_weight_linear_alt : forall σ e K σK w,
-    eval_star ⟨σ|e|K|σK|w⟩ = Rbar_mult w (eval_star ⟨σ|e|K|σK|1⟩).
+Lemma eval_star_weight_linear_alt : forall A σ e K σK w,
+    eval_star A ⟨σ|e|K|σK|w⟩ = Rbar_mult w (eval_star A ⟨σ|e|K|σK|1⟩).
 Proof.
   intros.
   replace w with (w*1) at 1 by ring.
@@ -901,17 +889,17 @@ Proof.
 Qed.
 
 (*** eval step lemmas *)
-Lemma eval_step_Seq : forall {n e1 e2 K σ1 σ2},
-    eval (S n) ⟨ σ1 | Seq e1 e2 | K | σ2 | 1 ⟩ =
-    eval n ⟨ Entropy_π1 σ1 | e1 | e2 -: K | (Entropy_π2 σ1)#σ2 | 1 ⟩.
+Lemma eval_step_Seq : forall {A n e1 e2 K σ1 σ2},
+    eval A (S n) ⟨ σ1 | Seq e1 e2 | K | σ2 | 1 ⟩ =
+    eval A n ⟨ Entropy_π1 σ1 | e1 | e2 -: K | (Entropy_π2 σ1)#σ2 | 1 ⟩.
 Proof.
   auto using eval_step.
 Qed.
 
-Lemma eval_step_Return : forall {n v e K σ1 σ2},
+Lemma eval_step_Return : forall {A n v e K σ1 σ2},
     VCLOSED v ->
-    eval (S n) ⟨ σ1 | v | e -: K | σ2 | 1 ⟩ =
-    eval n ⟨ Entropy_π1 σ2 | e.[v/] | K | Entropy_π2 σ2 | 1 ⟩.
+    eval A (S n) ⟨ σ1 | v | e -: K | σ2 | 1 ⟩ =
+    eval A n ⟨ Entropy_π1 σ2 | e.[v/] | K | Entropy_π2 σ2 | 1 ⟩.
 Proof.
   intros.
   eapply eval_step.
@@ -919,24 +907,24 @@ Proof.
   inversion H; subst; auto.
 Qed.
 
-Lemma eval_step_App : forall {n v b K σ1 σ2},
-    eval (S n) ⟨ σ1 | App (Fun b) v | K | σ2 | 1 ⟩ =
-    eval n ⟨ σ1 | b.[v/] | K | σ2 | 1 ⟩.
+Lemma eval_step_App : forall {A n v b K σ1 σ2},
+    eval A (S n) ⟨ σ1 | App (Fun b) v | K | σ2 | 1 ⟩ =
+    eval A n ⟨ σ1 | b.[v/] | K | σ2 | 1 ⟩.
 Proof.
   auto using eval_step.
 Qed.
 
-Lemma eval_step_Op1_Exp : forall {n r K σ1 σ2},
-    eval (S n) ⟨ σ1 | Op1 Exp (Const r) | K | σ2 | 1 ⟩ =
-    eval n ⟨ σ1 | Const (Rexp r) | K | σ2 | 1 ⟩.
+Lemma eval_step_Op1_Exp : forall {A n r K σ1 σ2},
+    eval A (S n) ⟨ σ1 | Op1 Exp (Const r) | K | σ2 | 1 ⟩ =
+    eval A n ⟨ σ1 | Const (Rexp r) | K | σ2 | 1 ⟩.
 Proof.
   auto using eval_step.
 Qed.
 
-Lemma eval_step_Op1_Log : forall {n r K σ1 σ2},
+Lemma eval_step_Op1_Log : forall {A n r K σ1 σ2},
     r <> 0 ->
-    eval (S n) ⟨ σ1 | Op1 Log (Const r) | K | σ2 | 1 ⟩ =
-    eval n ⟨ σ1 | Const (Rlog r) | K | σ2 | 1 ⟩.
+    eval A (S n) ⟨ σ1 | Op1 Log (Const r) | K | σ2 | 1 ⟩ =
+    eval A n ⟨ σ1 | Const (Rlog r) | K | σ2 | 1 ⟩.
 Proof.
   intros.
   eapply eval_step.
@@ -945,45 +933,45 @@ Proof.
   exfalso; auto.
 Qed.
 
-Lemma eval_step_Op1_Realp_1 : forall {n r K σ1 σ2},
-    eval (S n) ⟨ σ1 | Op1 Realp (Const r) | K | σ2 | 1 ⟩ =
-    eval n ⟨ σ1 | Const 1%R | K | σ2 | 1 ⟩.
+Lemma eval_step_Op1_Realp_1 : forall {A n r K σ1 σ2},
+    eval A (S n) ⟨ σ1 | Op1 Realp (Const r) | K | σ2 | 1 ⟩ =
+    eval A n ⟨ σ1 | Const 1%R | K | σ2 | 1 ⟩.
 Proof.
   eauto using eval_step.
 Qed.
 
-Lemma eval_step_Op1_Realp_0 : forall {n b K σ1 σ2},
-    eval (S n) ⟨ σ1 | Op1 Realp (Fun b) | K | σ2 | 1 ⟩ =
-    eval n ⟨ σ1 | Const 0%R | K | σ2 | 1 ⟩.
+Lemma eval_step_Op1_Realp_0 : forall {A n b K σ1 σ2},
+    eval A (S n) ⟨ σ1 | Op1 Realp (Fun b) | K | σ2 | 1 ⟩ =
+    eval A n ⟨ σ1 | Const 0%R | K | σ2 | 1 ⟩.
 Proof.
   eauto using eval_step.
 Qed.
 
-Lemma eval_step_Op2_Plus : forall {n r1 r2 K σ1 σ2},
-    eval (S n) ⟨ σ1 | Op2 Plus (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
-    eval n ⟨ σ1 | Const (Rplus r1 r2) | K | σ2 | 1 ⟩.
+Lemma eval_step_Op2_Plus : forall {A n r1 r2 K σ1 σ2},
+    eval A (S n) ⟨ σ1 | Op2 Plus (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
+    eval A n ⟨ σ1 | Const (Rplus r1 r2) | K | σ2 | 1 ⟩.
 Proof.
   auto using eval_step.
 Qed.
 
-Lemma eval_step_Op2_Minus : forall {n r1 r2 K σ1 σ2},
-    eval (S n) ⟨ σ1 | Op2 Minus (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
-    eval n ⟨ σ1 | Const (Rminus r1 r2) | K | σ2 | 1 ⟩.
+Lemma eval_step_Op2_Minus : forall {A n r1 r2 K σ1 σ2},
+    eval A (S n) ⟨ σ1 | Op2 Minus (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
+    eval A n ⟨ σ1 | Const (Rminus r1 r2) | K | σ2 | 1 ⟩.
 Proof.
   auto using eval_step.
 Qed.
 
-Lemma eval_step_Op2_Times : forall {n r1 r2 K σ1 σ2},
-    eval (S n) ⟨ σ1 | Op2 Times (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
-    eval n ⟨ σ1 | Const (Rmult r1 r2) | K | σ2 | 1 ⟩.
+Lemma eval_step_Op2_Times : forall {A n r1 r2 K σ1 σ2},
+    eval A (S n) ⟨ σ1 | Op2 Times (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
+    eval A n ⟨ σ1 | Const (Rmult r1 r2) | K | σ2 | 1 ⟩.
 Proof.
   auto using eval_step.
 Qed.
 
-Lemma eval_step_Op2_Div : forall {n r1 r2 K σ1 σ2},
+Lemma eval_step_Op2_Div : forall {A n r1 r2 K σ1 σ2},
     r2 <> 0 ->
-    eval (S n) ⟨ σ1 | Op2 Div (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
-    eval n ⟨ σ1 | Const (Rdiv r1 r2) | K | σ2 | 1 ⟩.
+    eval A (S n) ⟨ σ1 | Op2 Div (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
+    eval A n ⟨ σ1 | Const (Rdiv r1 r2) | K | σ2 | 1 ⟩.
 Proof.
   intros.
   eapply eval_step.
@@ -992,10 +980,10 @@ Proof.
   exfalso; auto.
 Qed.
 
-Lemma eval_step_Op2_Le_1 : forall {n r1 r2 K σ1 σ2},
+Lemma eval_step_Op2_Le_1 : forall {A n r1 r2 K σ1 σ2},
     r1 <= r2 ->
-    eval (S n) ⟨ σ1 | Op2 Le (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
-    eval n ⟨ σ1 | Const 1%R | K | σ2 | 1 ⟩.
+    eval A (S n) ⟨ σ1 | Op2 Le (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
+    eval A n ⟨ σ1 | Const 1%R | K | σ2 | 1 ⟩.
 Proof.
   intros.
   eapply eval_step.
@@ -1003,10 +991,10 @@ Proof.
   destruct Rle_dec; auto.
 Qed.
 
-Lemma eval_step_Op2_Le_0 : forall {n r1 r2 K σ1 σ2},
+Lemma eval_step_Op2_Le_0 : forall {A n r1 r2 K σ1 σ2},
     r2 < r1 ->
-    eval (S n) ⟨ σ1 | Op2 Le (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
-    eval n ⟨ σ1 | Const 0%R | K | σ2 | 1 ⟩.
+    eval A (S n) ⟨ σ1 | Op2 Le (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
+    eval A n ⟨ σ1 | Const 0%R | K | σ2 | 1 ⟩.
 Proof.
   intros.
   eapply eval_step.
@@ -1015,10 +1003,10 @@ Proof.
   exfalso; auto.
 Qed.
 
-Lemma eval_step_Op2_Lt_1 : forall {n r1 r2 K σ1 σ2},
+Lemma eval_step_Op2_Lt_1 : forall {A n r1 r2 K σ1 σ2},
     r1 < r2 ->
-    eval (S n) ⟨ σ1 | Op2 Lt (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
-    eval n ⟨ σ1 | Const 1%R | K | σ2 | 1 ⟩.
+    eval A (S n) ⟨ σ1 | Op2 Lt (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
+    eval A n ⟨ σ1 | Const 1%R | K | σ2 | 1 ⟩.
 Proof.
   intros.
   eapply eval_step.
@@ -1026,10 +1014,10 @@ Proof.
   destruct Rlt_dec; auto.
 Qed.
 
-Lemma eval_step_Op2_Lt_0 : forall {n r1 r2 K σ1 σ2},
+Lemma eval_step_Op2_Lt_0 : forall {A n r1 r2 K σ1 σ2},
     r2 <= r1 ->
-    eval (S n) ⟨ σ1 | Op2 Lt (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
-    eval n ⟨ σ1 | Const 0%R | K | σ2 | 1 ⟩.
+    eval A (S n) ⟨ σ1 | Op2 Lt (Const r1) (Const r2) | K | σ2 | 1 ⟩ =
+    eval A n ⟨ σ1 | Const 0%R | K | σ2 | 1 ⟩.
 Proof.
   intros.
   eapply eval_step.
@@ -1038,10 +1026,10 @@ Proof.
   exfalso; auto.
 Qed.
 
-Lemma eval_step_Cond_true : forall {n r et ef K σ1 σ2},
+Lemma eval_step_Cond_true : forall {A n r et ef K σ1 σ2},
     0 < r ->
-    eval (S n) ⟨ σ1 | Cond (Const r) et ef | K | σ2 | 1 ⟩ =
-    eval n ⟨ σ1 | et | K | σ2 | 1 ⟩.
+    eval A (S n) ⟨ σ1 | Cond (Const r) et ef | K | σ2 | 1 ⟩ =
+    eval A n ⟨ σ1 | et | K | σ2 | 1 ⟩.
 Proof.
   intros.
   eapply eval_step.
@@ -1049,10 +1037,10 @@ Proof.
   destruct Rlt_dec; auto.
 Qed.
 
-Lemma eval_step_Cond_false : forall {n r et ef K σ1 σ2},
+Lemma eval_step_Cond_false : forall {A n r et ef K σ1 σ2},
     r <= 0 ->
-    eval (S n) ⟨ σ1 | Cond (Const r) et ef | K | σ2 | 1 ⟩ =
-    eval n ⟨ σ1 | ef | K | σ2 | 1 ⟩.
+    eval A (S n) ⟨ σ1 | Cond (Const r) et ef | K | σ2 | 1 ⟩ =
+    eval A n ⟨ σ1 | ef | K | σ2 | 1 ⟩.
 Proof.
   intros.
   eapply eval_step.
@@ -1061,23 +1049,23 @@ Proof.
   exfalso; auto.
 Qed.
 
-Lemma eval_step_Sample : forall {n K σ1 σ2},
-    eval (S n) ⟨ σ1 | Sample | K | σ2 | 1 ⟩ =
-    eval n ⟨ Entropy_π1 σ1 | (Const (Entropy_extract (Entropy_π2 σ1))) | K | σ2 | 1 ⟩.
+Lemma eval_step_Sample : forall {A n K σ1 σ2},
+    eval A (S n) ⟨ σ1 | Sample | K | σ2 | 1 ⟩ =
+    eval A n ⟨ Entropy_π1 σ1 | (Const (Entropy_extract (Entropy_π2 σ1))) | K | σ2 | 1 ⟩.
 Proof.
   auto using eval_step.
 Qed.
 
-Lemma eval_step_Factor : forall {n r K σ1 σ2},
-    0 <= r ->
-    eval (S n) ⟨ σ1 | Factor (Const r) | K | σ2 | 1 ⟩ =
-    r * (eval n ⟨ σ1 | Const r | K | σ2 | 1 ⟩).
+Lemma eval_step_Factor : forall {A n r K σ1 σ2},
+    0 < r ->
+    eval A (S n) ⟨ σ1 | Factor (Const r) | K | σ2 | 1 ⟩ =
+    r * (eval A n ⟨ σ1 | Const r | K | σ2 | 1 ⟩).
 Proof.
   intros.
   rewrite <- eval_weight_linear.
   apply eval_step.
   cbn.
-  destruct Rle_dec.
+  destruct Rlt_dec.
   - replace (1*r) with (r*1) by ring.
     trivial.
   - apply n0 in H.

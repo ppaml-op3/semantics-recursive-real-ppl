@@ -29,9 +29,9 @@ Open Scope nat.
 Definition CIU (e1 e2 : Expr) :=
   ECLOSED e1 /\
   ECLOSED e2 /\
-  forall K,
+  forall K A,
     KCLOSED K ->
-    Rbar_le (μeval_star e1 K) (μeval_star e2 K).
+    Rbar_le (μeval_star e1 K A) (μeval_star e2 K A).
 
 (* Definition 7.2 (part 1) {def-ciu}.
    Scoping results from use of CIU, see CIU_open_scope. *)

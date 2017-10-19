@@ -22,23 +22,23 @@ Open Scope R.
 
 (*** From Evaluations to Measures. *)
 (* Definition 5.1 *)
-Definition μeval (n : nat) (e : Expr) (K : Kont) : Rbar :=
-  integrate (fun σ2 => integrate (fun σ1 => eval n ⟨ σ1 | e | K | σ2 | 1 ⟩)
+Definition μeval (n : nat) (e : Expr) (K : Kont) (A : Measurable R) : Rbar :=
+  integrate (fun σ2 => integrate (fun σ1 => eval A n ⟨ σ1 | e | K | σ2 | 1 ⟩)
                                  μentropy)
             μentropy.
 
-Definition μeval_star (e : Expr) (K : Kont) : Rbar :=
-  integrate (fun σ2 => integrate (fun σ1 => eval_star ⟨ σ1 | e | K | σ2 | 1 ⟩)
+Definition μeval_star (e : Expr) (K : Kont) (A : Measurable R) : Rbar :=
+  integrate (fun σ2 => integrate (fun σ1 => eval_star A ⟨ σ1 | e | K | σ2 | 1 ⟩)
                                  μentropy)
             μentropy.
 
-Lemma μeval_nonnegative : forall m e K,
-    Rbar_le 0 (μeval m e K).
+Lemma μeval_nonnegative : forall m e K A,
+    Rbar_le 0 (μeval m e K A).
 Proof.
   intros.
   unfold μeval.
   replace (Finite 0)
-    with (integrate (fun σ2 => (integrate (fun σ1 : Entropy => Rbar_mult (Finite 0) (eval m ⟨ σ1 | e | K | σ2 | 1 ⟩)) μentropy)) μentropy);
+    with (integrate (fun σ2 => (integrate (fun σ1 : Entropy => Rbar_mult (Finite 0) (eval A m ⟨ σ1 | e | K | σ2 | 1 ⟩)) μentropy)) μentropy);
     cycle -1.
   { repeat setoid_rewrite integrate_linear.
     rewrite Rbar_mult_0_l.
@@ -52,13 +52,13 @@ Qed.
 
 Hint Resolve μeval_nonnegative.
 
-Lemma μeval_star_nonnegative : forall e K,
-    Rbar_le 0 (μeval_star e K).
+Lemma μeval_star_nonnegative : forall e K A,
+    Rbar_le 0 (μeval_star e K A).
 Proof.
   intros.
   unfold μeval_star.
   replace (Finite 0)
-    with (integrate (fun σ2 => integrate (fun σ1 : Entropy => Rbar_mult (Finite 0) (eval_star ⟨ σ1 | e | K | σ2 | 1 ⟩)) μentropy) μentropy).
+    with (integrate (fun σ2 => integrate (fun σ1 : Entropy => Rbar_mult (Finite 0) (eval_star A ⟨ σ1 | e | K | σ2 | 1 ⟩)) μentropy) μentropy).
   - repeat (apply integrate_monotonic; intros).
     unfold eval_star.
     rewrite Rbar_mult_0_l.
@@ -78,8 +78,8 @@ Qed.
 Hint Resolve μeval_star_nonnegative.
 
 (* Lemma 5.3 part 3 *)
-Lemma μeval_index_monotonic : forall (n m : nat) (Hmn: (m <= n)%nat) (e : Expr) (K : Kont),
-    Rbar_le (μeval m e K) (μeval n e K).
+Lemma μeval_index_monotonic : forall (n m : nat) (Hmn: (m <= n)%nat) (e : Expr) (K : Kont) (A : Measurable R),
+    Rbar_le (μeval m e K A) (μeval n e K A).
 Proof.
   intros.
   unfold μeval.
@@ -94,15 +94,15 @@ Qed.
 Hint Resolve μeval_index_monotonic.
 
 (* Lemma 5.3 part 3 *)
-Lemma μeval_star_index_monotonic : forall (n : nat) (e : Expr) (K : Kont),
-    Rbar_le (μeval n e K) (μeval_star e K).
+Lemma μeval_star_index_monotonic : forall (n : nat) (e : Expr) (K : Kont) (A : Measurable R),
+    Rbar_le (μeval n e K A) (μeval_star e K A).
 Proof.
   intros.
   unfold μeval, μeval_star.
   repeat (apply integrate_monotonic; intros).
   unfold eval_star.
   intros.
-  apply (Lim_seq_monotonic (fun n => eval n ⟨ _ | e | K | _ | 1 ⟩)).
+  apply (Lim_seq_monotonic (fun n => eval A n ⟨ _ | e | K | _ | 1 ⟩)).
   intros.
   apply eval_index_monotonic; auto.
 Qed.
@@ -110,9 +110,9 @@ Qed.
 Hint Resolve μeval_star_index_monotonic.
 
 (* Lemma 5.4 part 4 (but using Lim_seq instead of Sup_seq) *)
-Lemma μeval_lim_interchange : forall e K,
-    μeval_star e K =
-    Sup_seq (fun n => μeval n e K).
+Lemma μeval_lim_interchange : forall e K A,
+    μeval_star e K A =
+    Sup_seq (fun n => μeval n e K A).
 Proof.
   intros.
   unfold μeval, μeval_star.
@@ -120,7 +120,7 @@ Proof.
   replace (Sup_seq _)
     with 
       (Sup_seq
-         (fun n => integrate (fun σ => eval n ⟨ Entropy_π1 σ | e | K | Entropy_π2 σ | 1 ⟩)
+         (fun n => integrate (fun σ => eval A n ⟨ Entropy_π1 σ | e | K | Entropy_π2 σ | 1 ⟩)
                              μentropy));
     cycle -1.
   { f_equal.
@@ -140,8 +140,8 @@ Qed.
 
 (* Shows that all of the following lemmas apply to μeval_star as well. *)
 
-Lemma μeval_0 : forall e K,
-    μeval 0 e K = 0.
+Lemma μeval_0 : forall e K A,
+    μeval 0 e K A = 0.
 Proof.
   intros.
   unfold μeval.
@@ -150,27 +150,27 @@ Proof.
   auto.
 Qed.
 
-Lemma μeval_star_step_1 : forall {e1 e2 K1 K2},
-    (forall n, μeval (S n) e1 K1 = μeval n e2 K2) ->
-    μeval_star e1 K1 = μeval_star e2 K2.
+Lemma μeval_star_step_1 : forall {e1 e2 K1 K2 A},
+    (forall n, μeval (S n) e1 K1 A = μeval n e2 K2 A) ->
+    μeval_star e1 K1 A = μeval_star e2 K2 A.
 Proof.
   intros.
   repeat rewrite μeval_lim_interchange.
   rewrite Sup_seq_incr_1 at 1; auto.
 Qed.
 
-Lemma μeval_star_step : forall j {e1 e2 K1 K2},
-    (forall n, μeval (j + n) e1 K1 = μeval n e2 K2) ->
-    μeval_star e1 K1 = μeval_star e2 K2.
+Lemma μeval_star_step : forall j {e1 e2 K1 K2 A},
+    (forall n, μeval (j + n) e1 K1 A = μeval n e2 K2 A) ->
+    μeval_star e1 K1 A = μeval_star e2 K2 A.
 Proof.
   intros.
   repeat rewrite μeval_lim_interchange.
   rewrite Sup_seq_incr_n with (j:=j) at 1; auto.
 Qed.
 
-Lemma μeval_star_step_end_1 : forall {e1 K1 r},
-    (forall n, μeval (S n) e1 K1 = r) ->
-    μeval_star e1 K1 = r.
+Lemma μeval_star_step_end_1 : forall {e1 K1 A r},
+    (forall n, μeval (S n) e1 K1 A = r) ->
+    μeval_star e1 K1 A = r.
 Proof.
   intros.
   repeat rewrite μeval_lim_interchange.
@@ -178,9 +178,9 @@ Proof.
   rewrite Sup_seq_incr_1 at 1; auto.
 Qed.
 
-Lemma μeval_star_step_end : forall j {e1 K1 r},
-    (forall n, μeval (j + n) e1 K1 = r) ->
-    μeval_star e1 K1 = r.
+Lemma μeval_star_step_end : forall j {e1 K1 A r},
+    (forall n, μeval (j + n) e1 K1 A = r) ->
+    μeval_star e1 K1 A = r.
 Proof.
   intros.
   repeat rewrite μeval_lim_interchange.
@@ -189,8 +189,8 @@ Proof.
 Qed.
 
 (* Lemma 5.4 {lemma-let} *)
-Lemma μeval_step_Seq : forall {n e1 e2 K},
-    μeval (S n) (Seq e1 e2) K = μeval n e1 (e2-:K).
+Lemma μeval_step_Seq : forall {n e1 e2 K A},
+    μeval (S n) (Seq e1 e2) K A = μeval n e1 (e2-:K) A.
 Proof.
   intros.
   unfold μeval.
@@ -199,13 +199,13 @@ Proof.
     (forall σ2,
         integrate
           (fun σ1 =>
-             eval n ⟨ Entropy_π1 σ1 | e1 | e2 -: K | Entropy_π2 σ1 # σ2 | 1 ⟩) μentropy
+             eval A n ⟨ Entropy_π1 σ1 | e1 | e2 -: K | Entropy_π2 σ1 # σ2 | 1 ⟩) μentropy
         =
         integrate
           (fun σ12 =>
              integrate
                (fun σ11 =>
-                  eval n ⟨ σ11 | e1 | e2 -: K | σ12 # σ2 | 1 ⟩) μentropy) μentropy)
+                  eval A n ⟨ σ11 | e1 | e2 -: K | σ12 # σ2 | 1 ⟩) μentropy) μentropy)
     by (setoid_rewrite split_entropy; auto).
   setoid_rewrite H.
   clear H.
@@ -215,9 +215,9 @@ Proof.
 Qed.
 
 (* Lemma 5.5 {lemma-return} *)
-Lemma μeval_step_Return : forall n v e K,
+Lemma μeval_step_Return : forall n v e K A,
     VCLOSED v ->
-    μeval (S n) v (e-:K) = μeval n e.[v/] K.
+    μeval (S n) v (e-:K) A = μeval n e.[v/] K A.
 Proof.
   unfold μeval.
   intros.
@@ -228,9 +228,9 @@ Proof.
 Qed.
 
 (* Lemma 5.6 {lemma-return} *)
-Lemma μeval_step_App : forall n b v K,
+Lemma μeval_step_App : forall n b v K A,
     VCLOSED v ->
-    μeval (S n) (App (Fun b) v) K = μeval n b.[v/] K.
+    μeval (S n) (App (Fun b) v) K A = μeval n b.[v/] K A.
 Proof.
   unfold μeval.
   intros.
@@ -238,8 +238,8 @@ Proof.
   trivial.
 Qed.
 
-Lemma μeval_step_Op1_Exp : forall n r K,
-    μeval (S n) (Op1 Exp (Const r)) K = μeval n (Const (Rexp r)) K.
+Lemma μeval_step_Op1_Exp : forall n r K A,
+    μeval (S n) (Op1 Exp (Const r)) K A = μeval n (Const (Rexp r)) K A.
 Proof.
   unfold μeval.
   intros.
@@ -247,10 +247,10 @@ Proof.
   trivial.
 Qed.
 
-Lemma μeval_step_Op1_Log : forall {n r K},
+Lemma μeval_step_Op1_Log : forall {n r K A},
     r <> 0 ->
-    μeval (S n) (Op1 Log (Const r)) K =
-    μeval n (Const (Rlog r)) K.
+    μeval (S n) (Op1 Log (Const r)) K A =
+    μeval n (Const (Rlog r)) K A.
 Proof.
   unfold μeval.
   intros.
@@ -258,8 +258,8 @@ Proof.
   trivial.
 Qed.
 
-Lemma μeval_step_Op1_Log_0 : forall {n K},
-    μeval (S n) (Op1 Log (Const 0)) K = 0.
+Lemma μeval_step_Op1_Log_0 : forall {n K A},
+    μeval (S n) (Op1 Log (Const 0)) K A = 0.
 Proof.
   unfold μeval.
   intros.
@@ -271,9 +271,9 @@ Proof.
   auto.
 Qed.
 
-Lemma μeval_step_Op1_Realp_1 : forall {n r K},
-    μeval (S n) (Op1 Realp (Const r)) K =
-    μeval n (Const 1%R) K.
+Lemma μeval_step_Op1_Realp_1 : forall {n r K A},
+    μeval (S n) (Op1 Realp (Const r)) K A =
+    μeval n (Const 1%R) K A.
 Proof.
   unfold μeval.
   intros.
@@ -281,9 +281,9 @@ Proof.
   trivial.
 Qed.
 
-Lemma μeval_step_Op1_Realp_0 : forall {n b K},
-    μeval (S n) (Op1 Realp (Fun b)) K =
-    μeval n (Const 0%R) K.
+Lemma μeval_step_Op1_Realp_0 : forall {n b K A},
+    μeval (S n) (Op1 Realp (Fun b)) K A =
+    μeval n (Const 0%R) K A.
 Proof.
   unfold μeval.
   intros.
@@ -291,9 +291,9 @@ Proof.
   trivial.
 Qed.
 
-Lemma μeval_step_Op2_Plus : forall {n r1 r2 K},
-    μeval (S n) (Op2 Plus (Const r1) (Const r2)) K =
-    μeval n (Const (Rplus r1 r2)) K.
+Lemma μeval_step_Op2_Plus : forall {n r1 r2 K A},
+    μeval (S n) (Op2 Plus (Const r1) (Const r2)) K A =
+    μeval n (Const (Rplus r1 r2)) K A.
 Proof.
   unfold μeval.
   intros.
@@ -301,9 +301,9 @@ Proof.
   trivial.
 Qed.
 
-Lemma μeval_step_Op2_Minus : forall {n r1 r2 K},
-    μeval (S n) (Op2 Minus (Const r1) (Const r2)) K =
-    μeval n (Const (Rminus r1 r2)) K.
+Lemma μeval_step_Op2_Minus : forall {n r1 r2 K A},
+    μeval (S n) (Op2 Minus (Const r1) (Const r2)) K A =
+    μeval n (Const (Rminus r1 r2)) K A.
 Proof.
   unfold μeval.
   intros.
@@ -311,9 +311,9 @@ Proof.
   trivial.
 Qed.
 
-Lemma μeval_step_Op2_Times : forall {n r1 r2 K},
-    μeval (S n) (Op2 Times (Const r1) (Const r2)) K =
-    μeval n (Const (Rmult r1 r2)) K.
+Lemma μeval_step_Op2_Times : forall {n r1 r2 K A},
+    μeval (S n) (Op2 Times (Const r1) (Const r2)) K A =
+    μeval n (Const (Rmult r1 r2)) K A.
 Proof.
   unfold μeval.
   intros.
@@ -321,10 +321,10 @@ Proof.
   trivial.
 Qed.
 
-Lemma μeval_step_Op2_Div : forall {n r1 r2 K},
+Lemma μeval_step_Op2_Div : forall {n r1 r2 K A},
     r2 <> 0 ->
-    μeval (S n) (Op2 Div (Const r1) (Const r2)) K =
-    μeval n (Const (Rdiv r1 r2)) K.
+    μeval (S n) (Op2 Div (Const r1) (Const r2)) K A =
+    μeval n (Const (Rdiv r1 r2)) K A.
 Proof.
   unfold μeval.
   intros.
@@ -332,8 +332,8 @@ Proof.
   trivial.
 Qed.
 
-Lemma μeval_step_Op2_Div_0 : forall {n r1 K},
-    μeval (S n) (Op2 Div (Const r1) (Const 0)) K = 0.
+Lemma μeval_step_Op2_Div_0 : forall {n r1 K A},
+    μeval (S n) (Op2 Div (Const r1) (Const 0)) K A = 0.
 Proof.
   unfold μeval.
   intros.
@@ -345,10 +345,10 @@ Proof.
   auto.
 Qed.
 
-Lemma μeval_step_Op2_Le_1 : forall {n r1 r2 K},
+Lemma μeval_step_Op2_Le_1 : forall {n r1 r2 K A},
     r1 <= r2 ->
-    μeval (S n) (Op2 Le (Const r1) (Const r2)) K =
-    μeval n (Const 1%R) K.
+    μeval (S n) (Op2 Le (Const r1) (Const r2)) K A =
+    μeval n (Const 1%R) K A.
 Proof.
   unfold μeval.
   intros.
@@ -356,10 +356,10 @@ Proof.
   trivial.
 Qed.
 
-Lemma μeval_step_Op2_Le_0 : forall {n r1 r2 K},
+Lemma μeval_step_Op2_Le_0 : forall {n r1 r2 K A},
     r2 < r1 ->
-    μeval (S n) (Op2 Le (Const r1) (Const r2)) K =
-    μeval n (Const 0%R) K.
+    μeval (S n) (Op2 Le (Const r1) (Const r2)) K A =
+    μeval n (Const 0%R) K A.
 Proof.
   unfold μeval.
   intros.
@@ -367,10 +367,10 @@ Proof.
   trivial.
 Qed.
 
-Lemma μeval_step_Op2_Lt_1 : forall {n r1 r2 K},
+Lemma μeval_step_Op2_Lt_1 : forall {n r1 r2 K A},
     r1 < r2 ->
-    μeval (S n) (Op2 Lt (Const r1) (Const r2)) K =
-    μeval n (Const 1%R) K.
+    μeval (S n) (Op2 Lt (Const r1) (Const r2)) K A =
+    μeval n (Const 1%R) K A.
 Proof.
   unfold μeval.
   intros.
@@ -378,10 +378,10 @@ Proof.
   trivial.
 Qed.
 
-Lemma μeval_step_Op2_Lt_0 : forall {n r1 r2 K},
+Lemma μeval_step_Op2_Lt_0 : forall {n r1 r2 K A},
     r2 <= r1 ->
-    μeval (S n) (Op2 Lt (Const r1) (Const r2)) K =
-    μeval n (Const 0%R) K.
+    μeval (S n) (Op2 Lt (Const r1) (Const r2)) K A =
+    μeval n (Const 0%R) K A.
 Proof.
   unfold μeval.
   intros.
@@ -389,10 +389,10 @@ Proof.
   trivial.
 Qed.
 
-Lemma μeval_step_Cond_true : forall {n r et ef K},
+Lemma μeval_step_Cond_true : forall {n r et ef K A},
     0 < r ->
-    μeval (S n) (Cond (Const r) et ef) K =
-    μeval n et K.
+    μeval (S n) (Cond (Const r) et ef) K A =
+    μeval n et K A.
 Proof.
   unfold μeval.
   intros.
@@ -400,10 +400,10 @@ Proof.
   trivial.
 Qed.
 
-Lemma μeval_step_Cond_false : forall {n r et ef K},
+Lemma μeval_step_Cond_false : forall {n r et ef K A},
     r <= 0 ->
-    μeval (S n) (Cond (Const r) et ef) K =
-    μeval n ef K.
+    μeval (S n) (Cond (Const r) et ef) K A =
+    μeval n ef K A.
 Proof.
   unfold μeval.
   intros.
@@ -412,9 +412,9 @@ Proof.
 Qed.
 
 (* Lemma 5.7 *)
-Lemma μeval_step_Sample : forall n K,
-    μeval (S n) Sample K =
-    integrate (fun σ => μeval n (Const (Entropy_extract σ)) K) μentropy.
+Lemma μeval_step_Sample : forall n K A,
+    μeval (S n) Sample K A =
+    integrate (fun σ => μeval n (Const (Entropy_extract σ)) K A) μentropy.
 Proof.
   intros.
   unfold μeval.
@@ -425,10 +425,10 @@ Proof.
 Qed.
 
 (* Lemma 5.7 *)
-Lemma μeval_step_Factor : forall n r K,
-    (0 <= r)%R ->
-    μeval (S n) (Factor (Const r)) K =
-    Rbar_mult r (μeval n (Const r) K).
+Lemma μeval_step_Factor : forall n r K A,
+    (0 < r)%R ->
+    μeval (S n) (Factor (Const r)) K A =
+    Rbar_mult r (μeval n (Const r) K A).
 Proof.
   intros.
   unfold μeval at 1.
@@ -441,8 +441,8 @@ Qed.
 
 Require Import Coq.Setoids.Setoid.
 
-Lemma μeval_step_App_Const : forall n r e K,
-    μeval n (App (Const r) e) K = 0%R.
+Lemma μeval_step_App_Const : forall n r e K A,
+    μeval n (App (Const r) e) K A = 0%R.
 Proof.
   intros.
   destruct n.
@@ -455,7 +455,7 @@ Proof.
 Qed.
 
 Lemma μeval_step_Fun_Knil : forall m b A,
-    μeval m (Fun b) (Knil A) = 0%R.
+    μeval m (Fun b) Knil A = 0%R.
 Proof.
   intros.
   unfold μeval.
@@ -466,8 +466,8 @@ Proof.
     auto.
 Qed.
 
-Lemma μeval_step_Factor_Fun : forall b n K,
-    μeval n (Factor (Fun b)) K = 0%R.
+Lemma μeval_step_Factor_Fun : forall b n K A,
+    μeval n (Factor (Fun b)) K A = 0%R.
 Proof.
   intros.
   unfold μeval.
@@ -480,18 +480,18 @@ Qed.
 
 Set Printing Coercions.
 
-Lemma μeval_star_step_Sample: forall K : Kont,
-    μeval_star Sample K =
-    integrate (fun σ : Entropy => μeval_star (Const (Entropy_extract σ)) K) μentropy.
+Lemma μeval_star_step_Sample: forall (K : Kont) A,
+    μeval_star Sample K A =
+    integrate (fun σ : Entropy => μeval_star (Const (Entropy_extract σ)) K A) μentropy.
 Proof.
-  intros K.
+  intros K A.
   unfold μeval_star at 1.
 
-  replace (fun σ2' => integrate (fun σ1' => eval_star _) μentropy)
+  replace (fun σ2' => integrate (fun σ1' => eval_star _ _) μentropy)
     with (fun σ2' =>
             integrate
               (fun σ1' =>
-                 eval_star ⟨ Entropy_π1 σ1' | Const (Entropy_extract (Entropy_π2 σ1')) | K | σ2' | 1 ⟩)
+                 eval_star A ⟨ Entropy_π1 σ1' | Const (Entropy_extract (Entropy_π2 σ1')) | K | σ2' | 1 ⟩)
               μentropy);
     revgoals.
   { extensionality σ2'.
@@ -503,12 +503,12 @@ Proof.
     auto.
   }
 
-  replace (fun σ2' => integrate (fun σ1' => eval_star _) _)
+  replace (fun σ2' => integrate (fun σ1' => eval_star _ _) _)
     with (fun σ2' =>
             integrate (fun σ2 =>
                          integrate
                            (fun σ1 =>
-                              eval_star ⟨σ1 | Const (Entropy_extract σ2) | K | σ2' | 1⟩)
+                              eval_star A ⟨σ1 | Const (Entropy_extract σ2) | K | σ2' | 1⟩)
                            μentropy)
                       μentropy)
     by (extensionality σ'; apply split_entropy).
@@ -518,81 +518,81 @@ Qed.
 
 Ltac run_μeval_1 :=
   match goal with
-  | [ |- context[ μeval (S ?n) (App (Fun ?b) ?v) ?K ] ] =>
-    setoid_replace (μeval (S n) (App (Fun b) v) K)
-      with (μeval n b.[v/] K)
+  | [ |- context[ μeval (S ?n) (App (Fun ?b) ?v) ?K ?A ] ] =>
+    setoid_replace (μeval (S n) (App (Fun b) v) K A)
+      with (μeval n b.[v/] K A)
       by (apply μeval_step_App;
           auto)
-  | [ |- context[ μeval (S ?n) (Seq ?e1 ?e2) ?K ] ] =>
-    setoid_replace (μeval (S n) (Seq e1 e2) K)
-      with (μeval n e1 (e2-:K))
+  | [ |- context[ μeval (S ?n) (Seq ?e1 ?e2) ?K ?A ] ] =>
+    setoid_replace (μeval (S n) (Seq e1 e2) K A)
+      with (μeval n e1 (e2-:K) A)
       by (apply μeval_step_Seq)
-  | [ |- context[ μeval (S ?n) Sample ?K ] ] =>
-    setoid_replace (μeval (S n) Sample K)
-      with (integrate (fun σ => μeval n (Const (Entropy_extract σ)) K) μentropy)
+  | [ |- context[ μeval (S ?n) Sample ?K ?A ] ] =>
+    setoid_replace (μeval (S n) Sample K A)
+      with (integrate (fun σ => μeval n (Const (Entropy_extract σ)) K A) μentropy)
       by (apply μeval_step_Sample)
-  | [ |- context[ μeval (S ?n) (Factor (Const ?r)) ?K ] ] =>
-    setoid_replace (μeval (S n) (Factor (Const r)) K)
-      with (Rbar_mult r (μeval n (Const r) K))
+  | [ |- context[ μeval (S ?n) (Factor (Const ?r)) ?K ?A ] ] =>
+    setoid_replace (μeval (S n) (Factor (Const r)) K A)
+      with (Rbar_mult r (μeval n (Const r) K A))
       by (apply μeval_step_Factor;
           destruct (Rle_dec 0 r);
           auto)
-  | [ |- context[ μeval (S ?n) ?v (?e-:?K) ] ] =>
-    setoid_replace (μeval (S n) v (e-:K))
-      with (μeval n e.[v/] K)
+  | [ |- context[ μeval (S ?n) ?v (?e-:?K) ?A ] ] =>
+    setoid_replace (μeval (S n) v (e-:K) A)
+      with (μeval n e.[v/] K A)
       by (apply μeval_step_Return;
           auto)
-  | [ |- context[ μeval 0 ?e ?K ] ] =>
-    setoid_replace (μeval 0 e K)
+  | [ |- context[ μeval 0 ?e ?K ?A ] ] =>
+    setoid_replace (μeval 0 e K A)
       with 0%R
       by (apply μeval_0;
           auto)
-  | [ |- context[ μeval ?n (App (Const ?r) ?v) ?K ] ] =>
-    setoid_replace (μeval n (App (Const r) v) K)
+  | [ |- context[ μeval ?n (App (Const ?r) ?v) ?K ?A ] ] =>
+    setoid_replace (μeval n (App (Const r) v) K A)
       with 0%R
       by (apply μeval_step_App_Const)
   (* Op1 *)
-  | [ |- context[ μeval ?n (Op1 Exp (Const ?r)) ?K ] ] =>
-    setoid_replace (μeval n (Op1 Exp (Const r)) K)
-      with (μeval n (Const (Rexp r)) K)
+  | [ |- context[ μeval ?n (Op1 Exp (Const ?r)) ?K ?A ] ] =>
+    setoid_replace (μeval n (Op1 Exp (Const r)) K A)
+      with (μeval n (Const (Rexp r)) K A)
       by (apply μeval_step_Op1_Exp)
-  | [ |- context[ μeval ?n (Op1 Log (Const ?r)) ?K ] ] =>
-    setoid_replace (μeval n (Op1 Log (Const r)) K)
-      with (μeval n (Const (Rlog r)) K)
+  | [ |- context[ μeval ?n (Op1 Log (Const ?r)) ?K ?A ] ] =>
+    setoid_replace (μeval n (Op1 Log (Const r)) K A)
+      with (μeval n (Const (Rlog r)) K A)
       by (apply μeval_step_Op1_Log)
-  | [ |- context[ μeval ?n (Op1 Realp (Const ?r)) ?K ] ] =>
-    setoid_replace (μeval n (Op1 Realp (Const r)) K)
-      with (μeval n (Const 1%R) K)
+  | [ |- context[ μeval ?n (Op1 Realp (Const ?r)) ?K ?A ] ] =>
+    setoid_replace (μeval n (Op1 Realp (Const r)) K A)
+      with (μeval n (Const 1%R) K A)
       by (apply μeval_step_Op1_Realp_1)
-  | [ |- context[ μeval ?n (Op1 Realp (Fun ?b)) ?K ] ] =>
-    setoid_replace (μeval n (Op1 Realp (Fun ?b)) K)
-      with (μeval n (Const 0%R) K)
+  | [ |- context[ μeval ?n (Op1 Realp (Fun ?b)) ?K ?A ] ] =>
+    setoid_replace (μeval n (Op1 Realp (Fun ?b)) K A)
+      with (μeval n (Const 0%R) K A)
       by (apply μeval_step_Op1_Realp_0)
   (* Op2 *)
-  | [ |- context[ μeval ?n (Op2 Plus (Const ?r1) (Const ?r2)) ?K ] ] =>
-    setoid_replace (μeval n (Op2 Plus (Const r1) (Const r2)) K)
-      with (μeval n (Const (Rplus r1 r2)) K)
+  | [ |- context[ μeval ?n (Op2 Plus (Const ?r1) (Const ?r2)) ?K ?A ] ] =>
+    setoid_replace (μeval n (Op2 Plus (Const r1) (Const r2)) K A)
+      with (μeval n (Const (Rplus r1 r2)) K A)
       by (apply μeval_step_Op2_Plus)
-  | [ |- context[ μeval ?n (Op2 Minus (Const ?r1) (Const ?r2)) ?K ] ] =>
-    setoid_replace (μeval n (Op2 Minus (Const r1) (Const r2)) K)
-      with (μeval n (Const (Rminus r1 r2)) K)
+  | [ |- context[ μeval ?n (Op2 Minus (Const ?r1) (Const ?r2)) ?K ?A ] ] =>
+    setoid_replace (μeval n (Op2 Minus (Const r1) (Const r2)) K A)
+      with (μeval n (Const (Rminus r1 r2)) K A)
       by (apply μeval_step_Op2_Minus)
-  | [ |- context[ μeval ?n (Op2 Times (Const ?r1) (Const ?r2)) ?K ] ] =>
-    setoid_replace (μeval n (Op2 Times (Const r1) (Const r2)) K)
-      with (μeval n (Const (Rmult r1 r2)) K)
+  | [ |- context[ μeval ?n (Op2 Times (Const ?r1) (Const ?r2)) ?K ?A ] ] =>
+    setoid_replace (μeval n (Op2 Times (Const r1) (Const r2)) K A)
+      with (μeval n (Const (Rmult r1 r2)) K A)
       by (apply μeval_step_Op2_Times)
-  | [ |- context[ μeval ?n (Op2 Div (Const ?r1) (Const ?r2)) ?K ] ] =>
-    setoid_replace (μeval n (Op2 Div (Const r1) (Const r2)) K)
-      with (μeval n (Const (Rdiv r1 r2)) K)
+  | [ |- context[ μeval ?n (Op2 Div (Const ?r1) (Const ?r2)) ?K ?A ] ] =>
+    setoid_replace (μeval n (Op2 Div (Const r1) (Const r2)) K A)
+      with (μeval n (Const (Rdiv r1 r2)) K A)
       by (apply μeval_step_Op2_Div)
   (* Fun Knil *)
-  | [ |- context[ μeval ?n (Fun ?b) (Knil ?A) ] ] =>
-    setoid_replace (μeval n (Fun b) (Knil A))
+  | [ |- context[ μeval ?n (Fun ?b) Knil ?A ] ] =>
+    setoid_replace (μeval n (Fun b) Knil A)
       with 0%R
       by (apply μeval_step_Fun_Knil)
   (* Factor Fun *)
-  | [ |- context[ μeval ?n (Factor (Fun ?b)) ?K ] ] =>
-    setoid_replace (μeval n (Factor (Fun b)) K)
+  | [ |- context[ μeval ?n (Factor (Fun ?b)) ?K ?A ] ] =>
+    setoid_replace (μeval n (Factor (Fun b)) K A)
       with 0%R
       by (apply μeval_step_Factor_Fun)
   | _ => fail "no μeval found"
@@ -601,54 +601,54 @@ Ltac run_μeval_1 :=
 
 Ltac run_μeval_H_1 H :=
   match goal with
-  | [ H : context[ μeval (S ?n) (App (Fun ?b) ?v) ?K ] |- _ ] =>
-    setoid_replace (μeval (S n) (App (Fun b) v) K)
-      with (μeval n b.[v/] K)
+  | [ H : context[ μeval (S ?n) (App (Fun ?b) ?v) ?K ?A ] |- _ ] =>
+    setoid_replace (μeval (S n) (App (Fun b) v) K A)
+      with (μeval n b.[v/] K A)
       in H
       by (apply μeval_step_App;
           auto)
-  | [ H : context[ μeval (S ?n) (Seq ?e1 ?e2) ?K ] |- _ ] =>
-    setoid_replace (μeval (S n) (Seq e1 e2) K)
-      with (μeval n e1 (e2-:K))
+  | [ H : context[ μeval (S ?n) (Seq ?e1 ?e2) ?K ?A ] |- _ ] =>
+    setoid_replace (μeval (S n) (Seq e1 e2) K A)
+      with (μeval n e1 (e2-:K) A)
       in H
       by (apply μeval_step_Seq)
-  | [ H : context[ μeval (S ?n) Sample ?K ] |- _ ] =>
-    setoid_replace (μeval (S n) Sample K)
-      with (integrate (fun σ => μeval n (Const (Entropy_extract σ)) K) μentropy)
+  | [ H : context[ μeval (S ?n) Sample ?K ?A ] |- _ ] =>
+    setoid_replace (μeval (S n) Sample K A)
+      with (integrate (fun σ => μeval n (Const (Entropy_extract σ)) K A) μentropy)
       in H
       by (apply μeval_step_Sample)
-  | [ H : context[ μeval (S ?n) (Factor (Const ?r)) ?K ] |- _ ] =>
-    setoid_replace (μeval (S n) (Factor (Const r)) K)
-      with (Rbar_mult r (μeval n (Const r) K))
+  | [ H : context[ μeval (S ?n) (Factor (Const ?r)) ?K ?A ] |- _ ] =>
+    setoid_replace (μeval (S n) (Factor (Const r)) K A)
+      with (Rbar_mult r (μeval n (Const r) K A))
       in H
       by (apply μeval_step_Factor;
           destruct (Rle_dec 0 r);
           auto)
-  | [ H : context[ μeval (S ?n) ?v (?e-:?K) ] |- _ ] =>
-    setoid_replace (μeval (S n) v (e-:K))
-      with (μeval n e.[v/] K)
+  | [ H : context[ μeval (S ?n) ?v (?e-:?K) ?A ] |- _ ] =>
+    setoid_replace (μeval (S n) v (e-:K) A)
+      with (μeval n e.[v/] K A)
       in H
       by (apply μeval_step_Return;
           auto)
-  | [ H : context[ μeval 0 ?e ?K ] |- _ ] =>
-    setoid_replace (μeval 0 e K)
+  | [ H : context[ μeval 0 ?e ?K ?A ] |- _ ] =>
+    setoid_replace (μeval 0 e K A)
       with 0%R
       in H
       by (apply μeval_0;
           auto)
-  | [ H : context[ μeval ?n (App (Const _) ?v) ?K ] |- _ ] =>
-    setoid_replace (μeval n (App (Const _) v) K)
+  | [ H : context[ μeval ?n (App (Const _) ?v) ?K ?A ] |- _ ] =>
+    setoid_replace (μeval n (App (Const _) v) K A)
       with 0%R
       in H
       by (apply μeval_step_App_Const;
           auto)
-  | [ |- context[ μeval ?n (Fun ?b) (Knil ?A) ] ] =>
-    setoid_replace (μeval n (Fun b) (Knil A))
+  | [ |- context[ μeval ?n (Fun ?b) Knil ?A ] ] =>
+    setoid_replace (μeval n (Fun b) Knil A)
       with 0%R
       in H
       by (apply μeval_step_Fun_Knil)
-  | [ |- context[ μeval ?n (Factor (Fun ?b)) ?K ] ] =>
-    setoid_replace (μeval n (Factor (Fun b)) K)
+  | [ |- context[ μeval ?n (Factor (Fun ?b)) ?K ?A ] ] =>
+    setoid_replace (μeval n (Factor (Fun b)) K A)
       with 0%R
       in H
       by (apply μeval_step_Factor_Fun)
@@ -692,9 +692,9 @@ Ltac run_μeval_star_for n :=
            run_μeval;
            reflexivity]].
 
-Lemma pure_steps_monotonic_μeval : forall e K e' K',
+Lemma pure_steps_monotonic_μeval : forall e K e' K' A,
     (forall σ σK w, step ⟨ σ | e | K | σK | w ⟩ = Some ⟨ σ | e' | K' | σK | w ⟩) ->
-    forall n, Rbar_le (μeval n e K) (μeval n e' K').
+    forall n, Rbar_le (μeval n e K A) (μeval n e' K' A).
 Proof.
   intros.
   unfold μeval.
@@ -704,9 +704,9 @@ Proof.
   - destruct e; auto.
 Qed.
 
-Lemma pure_steps_preserve_μeval_star : forall e K e' K',
+Lemma pure_steps_preserve_μeval_star : forall e K e' K' A,
     (forall σ σK w, step ⟨ σ | e | K | σK | w ⟩ = Some ⟨ σ | e' | K' | σK | w ⟩) ->
-    μeval_star e K = μeval_star e' K'.
+    μeval_star e K A = μeval_star e' K' A.
 Proof.
   intros.
   unfold μeval_star.
@@ -723,9 +723,9 @@ Proof.
   - apply H.
 Qed.
 
-Lemma pure_steps_preserve_μeval : forall n e K e' K',
+Lemma pure_steps_preserve_μeval : forall n e K e' K' A,
     (forall σ σK w, step ⟨ σ | e | K | σK | w ⟩ = Some ⟨ σ | e' | K' | σK | w ⟩) ->
-    μeval (S n) e K = μeval n e' K'.
+    μeval (S n) e K A = μeval n e' K' A.
 Proof.
   intros.
   unfold μeval.
@@ -743,7 +743,7 @@ Local Open Scope nat.
 Definition loop := (App (Fun (App (Var 0) (Var 0)))
                         (Fun (App (Var 0) (Var 0)))).
 
-Lemma μeval_loop_0 : forall K n, μeval n loop K = 0%R.
+Lemma μeval_loop_0 : forall K A n, μeval n loop K A = 0%R.
 Proof.
   induction n using lt_wf_ind; intros.
   destruct n as [|[|]];
@@ -752,7 +752,7 @@ Proof.
     auto.
 Qed.
 
-Lemma μeval_star_loop_0 : forall K, μeval_star loop K = 0%R.
+Lemma μeval_star_loop_0 : forall K A, μeval_star loop K A = 0%R.
 Proof.
   intros.
   rewrite μeval_lim_interchange.

@@ -1023,7 +1023,7 @@ Hint Resolve vclosed_sub_closed.
 (* Continuations *)
 
 Inductive Kont : Type :=
-| Knil : forall (A : Measurable R), Kont
+| Knil : Kont
 | Kcons : Expr -> Kont -> Kont.
 
 Infix "-:" := Kcons (at level 60, right associativity).
@@ -1036,33 +1036,27 @@ Proof.
     destruct K';
     intros;
     try solve [intuition auto].
-  - destruct (Measurable_R_eq_dec A A0).
-    + subst.
-      intuition.
-    + right.
-      contradict H.
-      inversion H; auto.
-  - destruct (Expr_eq_dec e e0);
-      subst;
-      revgoals.
-    { right.
-      contradict n.
-      inversion n; subst; auto.
-    }
-    specialize (IHK K').
-    inversion IHK; subst.
-    + left; auto.
-    + right.
-      contradict H.
-      inversion H.
-      auto.
+  destruct (Expr_eq_dec e e0);
+    subst;
+    revgoals.
+  { right.
+    contradict n.
+    inversion n; subst; auto.
+  }
+  specialize (IHK K').
+  inversion IHK; subst.
+  + left; auto.
+  + right.
+    contradict H.
+    inversion H.
+    auto.
 Qed.
 
 Reserved Notation "'KCLOSED' K" (at level 69).
 
 Inductive KontScoped : forall K, Prop :=
-| KontScoped_nil : forall A,
-    KCLOSED Knil A
+| KontScoped_nil :
+    KCLOSED Knil
 | KontScoped_cons : forall K e,
     EXP 1 ⊢ e ->
     KCLOSED K ->

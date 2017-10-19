@@ -29,18 +29,18 @@ Definition Krel'
            (Vrel : forall m, m <= n -> Expr -> Expr -> Prop)
            (K1 K2 : Kont) : Prop :=
   KCLOSED K1 /\ KCLOSED K2 /\
-  forall m (Hmn : m <= n) v1 v2,
+  forall m (Hmn : m <= n) v1 v2 (A : Measurable R),
     Vrel m Hmn v1 v2 ->
-    Rbar_le (μeval m v1 K1) (μeval_star v2 K2).
+    Rbar_le (μeval m v1 K1 A) (μeval_star v2 K2 A).
 
 Definition Erel'
            (n : nat)
            (Vrel : forall m, m <= n -> Expr -> Expr -> Prop)
            (e1 e2 : Expr) : Prop :=
   ECLOSED e1 /\ ECLOSED e2 /\
-  forall m (Hmn : m <= n) K1 K2,
+  forall m (Hmn : m <= n) K1 K2 (A : Measurable R),
     Krel' m (fun m' H => Vrel m' (le_trans _ _ _ H Hmn)) K1 K2 ->
-    Rbar_le (μeval m e1 K1) (μeval_star e2 K2).
+    Rbar_le (μeval m e1 K1 A) (μeval_star e2 K2 A).
 
 Definition Vrel_rec
            (n : nat)
