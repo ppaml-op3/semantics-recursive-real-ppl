@@ -32,6 +32,7 @@ To build, use `make` or run using ProofGeneral.
 - `Interpolation.v`: The interpolation and genericity theorems for manipulating
   small-step semantics as if they were big-step semantics.
   preserve measure.
+- `EntropyShuffling.v`: Lemmas about Entropy reshufflings that preserve measure.
 
 # Acknowledgment
 
